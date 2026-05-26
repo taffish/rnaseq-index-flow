@@ -1,0 +1,9 @@
+##gff-version 3
+chr1	smoke	gene	1	39	.	+	.	ID=gene1;Name=gene1
+chr1	smoke	mRNA	1	39	.	+	.	ID=tx1;Parent=gene1
+chr1	smoke	exon	1	39	.	+	.	ID=exon1;Parent=tx1
+chr1	smoke	CDS	1	39	.	+	0	ID=cds1;Parent=tx1
+chr1	smoke	gene	40	78	.	+	.	ID=gene2;Name=gene2
+chr1	smoke	mRNA	40	78	.	+	.	ID=tx2;Parent=gene2
+chr1	smoke	exon	40	78	.	+	.	ID=exon2;Parent=tx2
+chr1	smoke	CDS	40	78	.	+	0	ID=cds2;Parent=tx2
