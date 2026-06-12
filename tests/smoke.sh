@@ -61,7 +61,7 @@ taf check
 echo "[SMOKE] taf build"
 taf build
 
-flow_cmd="$project_dir/target/taf-rnaseq-index-flow-v0.1.0-r1"
+flow_cmd="$project_dir/target/taf-rnaseq-index-flow-v0.2.0-r1"
 if [ ! -x "$flow_cmd" ]; then
     echo "smoke: built flow command is missing or not executable: $flow_cmd" >&2
     exit 1
@@ -84,7 +84,8 @@ echo "[SMOKE] rnaseq-index-flow genome+annotation --indexer both"
         --threads 1 \
         --indexer both \
         --genome-indexer hisat2 \
-        --kmer 15
+        --kmer 15 \
+        @hisat2-build-step: --quiet @:
 )
 cd "$project_dir"
 
@@ -125,6 +126,7 @@ grep -F 'taf-gffread-v0.12.9-r1' "$out/04_reports/commands.sh" >/dev/null
 grep -F 'taf-salmon-v1.11.4-r1' "$out/04_reports/commands.sh" >/dev/null
 grep -F 'taf-kallisto-v0.52.0-r1' "$out/04_reports/commands.sh" >/dev/null
 grep -F 'taf-hisat2-v2.2.2-r2' "$out/04_reports/commands.sh" >/dev/null
+grep -F -- '--quiet' "$out/04_reports/commands.sh" >/dev/null
 grep -F 'taf-salmon	1.11.4-r1' "$out/04_reports/versions.tsv" >/dev/null
 grep -F 'taf-hisat2	2.2.2-r2' "$out/04_reports/versions.tsv" >/dev/null
 grep -F 'transcript_count	2' "$out/04_reports/reference_summary.tsv" >/dev/null

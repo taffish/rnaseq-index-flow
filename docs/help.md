@@ -1,15 +1,11 @@
-rnaseq-index-flow 0.1.0-r1
+rnaseq-index-flow 0.2.0-r1
 
 Purpose:
   Prepare a reusable transcriptome reference bundle for TAFFISH RNA-seq flows.
-  r1 accepts either genome FASTA plus GTF/GFF3 annotation, or transcript FASTA
+  0.2 accepts either genome FASTA plus GTF/GFF3 annotation, or transcript FASTA
   plus tx2gene.tsv, and builds Salmon and optional Kallisto transcriptome
   indexes plus an optional HISAT2 genome index with logs and provenance.
-
-Flow family role:
-  This is a TAFFISH RNA-seq subflow. It can be run directly to prepare
-  reference/index outputs, and its stable output contract is intended for
-  future rnaseq-standard-flow orchestration.
+  0.2 keeps the r1 interface and adds advanced per-step @: passthrough slots.
 
 Usage:
   taf-rnaseq-index-flow \
@@ -64,48 +60,72 @@ Common options:
       Replace the standard rnaseq-index-flow output files inside an existing
       output directory.
 
-Output tree:
-  <outdir>/00_inputs/reference_inputs.tsv
-  <outdir>/00_inputs/genome.fa and annotation.gxf in genome+annotation mode
-  <outdir>/00_inputs/transcripts.fa and tx2gene.tsv in transcripts-only mode
-  <outdir>/01_logs/flow.log
-  <outdir>/01_logs/steps/
-  <outdir>/02_intermediate/annotation/
-  <outdir>/03_results/annotation/genes.gff3
-  <outdir>/03_results/annotation/genes.gtf
+Key outputs:
   <outdir>/03_results/transcripts/transcripts.fa
+      Transcript FASTA for quantification.
+
   <outdir>/03_results/tx2gene.tsv
+      Tab-delimited tx_id/gene_id map for expression summarization.
+
   <outdir>/03_results/salmon_index/
+      Salmon transcriptome index for rnaseq-expression-flow.
+
   <outdir>/03_results/kallisto_index/
-  <outdir>/03_results/hisat2_index/
-  <outdir>/04_reports/reference_summary.tsv
-  <outdir>/04_reports/genome_index.tsv
-  <outdir>/04_reports/flow_summary.tsv
-  <outdir>/04_reports/versions.tsv
-  <outdir>/04_reports/commands.sh
-  <outdir>/04_reports/methods.txt
-  <outdir>/run.manifest.json
+      Optional Kallisto index when --indexer kallisto or both is used.
 
-tx2gene.tsv format:
-  tx_id<TAB>gene_id
-  TX1<TAB>GENE1
-  TX2<TAB>GENE1
+  <outdir>/03_results/hisat2_index/genome
+      Optional HISAT2 prefix when --genome-indexer hisat2 is used.
 
-Dependencies:
-  taf-agat 1.7.0-r1
-  taf-gffread 0.12.9-r1
-  taf-salmon 1.11.4-r1
-  taf-kallisto 0.52.0-r1
-  taf-hisat2 2.2.2-r2
+  <outdir>/04_reports/
+      Summary tables, commands.sh, versions.tsv, methods.txt, and provenance.
+
+Upstream/downstream:
+  Upstream:
+    genome FASTA + GTF/GFF3 annotation, or transcript FASTA + tx2gene.tsv.
+
+  Downstream:
+    rnaseq-expression-flow uses salmon_index and tx2gene.tsv.
+    rnaseq-alignment-flow can use hisat2_index/genome when built.
+
+Advanced step passthrough:
+  These slots are optional expert escape hatches for native tool parameters.
+  They default to empty and are not needed for normal use. Flow-managed inputs,
+  outputs, threads, k-mer, and index choices remain top-level options above.
+
+  @agat-convert-step: ... @:
+      Extra native arguments for agat_convert_sp_gxf2gxf.pl.
+
+  @gffread-gtf-step: ... @:
+      Extra native arguments for the gffread GTF conversion step.
+
+  @gffread-transcripts-step: ... @:
+      Extra native arguments for the gffread transcript FASTA extraction step.
+
+  @salmon-index-step: ... @:
+      Extra native arguments for salmon index.
+
+  @kallisto-index-step: ... @:
+      Extra native arguments for kallisto index.
+
+  @hisat2-build-step: ... @:
+      Extra native arguments for hisat2-build.
+
+  Example:
+      taf-rnaseq-index-flow --genome genome.fa --annotation genes.gff3 \
+        --outdir ref-out --genome-indexer hisat2 \
+        @hisat2-build-step: --quiet @:
 
 Boundaries:
-  r1 does not build STAR, RSEM, decoy-aware Salmon, or species-specific
+  0.2 does not build STAR, RSEM, decoy-aware Salmon, or species-specific
   reference resources. It does not download reference data or edit input files.
   Annotation attributes must contain recognizable transcript and gene
   relationships after AGAT normalization, or the user should provide
   transcripts plus tx2gene.tsv. Genome FASTA header IDs must match annotation
   seqids; inputs are copied into <outdir>/00_inputs/ before taf-tool
   dependencies consume them.
+
+Detailed documentation:
+  https://github.com/taffish/rnaseq-index-flow
 
 Wrapper options:
   -h, --help       Show this help.

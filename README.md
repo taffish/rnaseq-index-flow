@@ -12,10 +12,11 @@ Package identity:
 - name: `rnaseq-index-flow`
 - command: `taf-rnaseq-index-flow`
 - kind: `flow`
-- version: `0.1.0-r1`
+- version: `0.2.0-r1`
 - license: Apache-2.0
+- repository: https://github.com/taffish/rnaseq-index-flow
 
-## RNA-seq Flow Position
+## Flow Position
 
 This app is a reusable subflow in the TAFFISH bulk RNA-seq flow family. It can
 be run directly when users only need a reference/index bundle, and it is also
@@ -25,7 +26,7 @@ its internal reference-preparation logic.
 
 ## Scope
 
-r1 supports:
+0.2 supports:
 
 - genome FASTA + GTF/GFF3 annotation input
 - transcript FASTA + `tx2gene.tsv` input
@@ -39,8 +40,9 @@ r1 supports:
 - container-local input snapshots under `<outdir>/00_inputs/`
 - provenance files: `commands.sh`, `versions.tsv`, `methods.txt`,
   `flow_summary.tsv`, `reference_summary.tsv`, and `run.manifest.json`
+- optional expert `@:` passthrough slots for each biological tool call
 
-r1 does not build STAR, RSEM, decoy-aware Salmon, or species-specific reference
+0.2 does not build STAR, RSEM, decoy-aware Salmon, or species-specific reference
 resources. It does not download reference data during normal execution.
 
 ## Dependencies
@@ -59,6 +61,31 @@ The script also uses ordinary shell utilities (`sh`, `awk`, `sed`, `date`,
 `mkdir`, `cp`, `rm`, `grep`, and related POSIX tools) for validation,
 bookkeeping, and provenance. It does not call host-installed `agat`,
 `gffread`, `salmon`, `kallisto`, or `hisat2`.
+
+## Input Formats
+
+This flow has two mutually exclusive input modes.
+
+Genome + annotation mode:
+
+- `--genome`: genome FASTA. FASTA record IDs must match annotation seqids.
+- `--annotation`: GTF or GFF3 annotation with recognizable gene/transcript
+  relationships after AGAT normalization.
+
+Transcripts-only mode:
+
+- `--transcripts`: transcript FASTA.
+- `--tx2gene`: tab-delimited transcript-to-gene map with columns `tx_id` and
+  `gene_id`.
+
+```text
+tx_id	gene_id
+TX1	GENE1
+TX2	GENE1
+```
+
+All input files are copied into `<outdir>/00_inputs/` before dependency tools
+consume them.
 
 ## Usage
 
@@ -132,7 +159,39 @@ Common controls:
 - `--force`: replace only the standard rnaseq-index-flow output files inside an
   existing output directory.
 
-## Outputs
+## Advanced Per-Step Passthrough
+
+These `@:` slots are optional expert escape hatches for native tool arguments.
+They default to empty and are not required for normal use. The flow keeps
+inputs, outputs, thread count, k-mer size, and index choices as stable top-level
+parameters; use these slots only when you intentionally need an upstream tool
+option that is not modeled by the flow.
+
+The general syntax is documented in the
+[TAFFISH Flow Developer Guide (English)](https://github.com/taffish/taffish-docs/blob/main/en/taf-flow-developer-guide.en.md)
+and [TAFFISH Flow 开发者指南（中文）](https://github.com/taffish/taffish-docs/blob/main/zh/taf-flow-developer-guide.cn.md).
+
+| Slot | Call site |
+| --- | --- |
+| `@agat-convert-step: ... @:` | `agat_convert_sp_gxf2gxf.pl` annotation normalization |
+| `@gffread-gtf-step: ... @:` | `gffread` GTF conversion |
+| `@gffread-transcripts-step: ... @:` | `gffread` transcript FASTA extraction |
+| `@salmon-index-step: ... @:` | `salmon index` |
+| `@kallisto-index-step: ... @:` | `kallisto index` |
+| `@hisat2-build-step: ... @:` | `hisat2-build` |
+
+Example:
+
+```sh
+taf-rnaseq-index-flow \
+  --genome genome.fa \
+  --annotation genes.gff3 \
+  --outdir ref-out \
+  --genome-indexer hisat2 \
+  @hisat2-build-step: --quiet @:
+```
+
+## Output Layout
 
 All flow-created outputs are written under `<outdir>/`:
 
@@ -206,7 +265,7 @@ taf-rnaseq-alignment-flow \
   --outdir align-out
 ```
 
-## Data Flow
+## Data Flow and Contracts
 
 1. Validate inputs and refuse an existing output directory unless `--force` is
    set.
@@ -251,7 +310,7 @@ seqids in the first column of the annotation for all annotated sequences. If the
 annotation uses `chrI`/`chrII` style names, the genome FASTA must expose those
 same names rather than unrelated RefSeq accessions.
 
-Annotation attributes differ across sources. r1 expects transcript features
+Annotation attributes differ across sources. 0.2 expects transcript features
 with recognizable IDs and parent gene IDs after AGAT normalization. If
 `tx2gene.tsv` has no data rows, clean or simplify the annotation first, or use
 transcripts-only mode with a curated `tx2gene.tsv`.
@@ -282,3 +341,10 @@ central data tree can be prepared with
 `repos/apps/bio/flows/rna-seq/test-data/yeast/rnaseq-yeast-get-data`; downstream
 formal tests read it via `TAFFISH_RNASEQ_TESTDATA` or the default local
 `test-data/yeast/data/03_results` path.
+
+## License and Citation
+
+TAFFISH app packaging: Apache-2.0.
+
+Upstream tools keep their own license and citation requirements. See the
+dependency app records and upstream projects for details.

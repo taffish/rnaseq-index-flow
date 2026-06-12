@@ -12,13 +12,19 @@ ARGS
   none
 <(--kmer)kmer>
   31
+<(@:)agat-convert-step>
+<(@:)gffread-gtf-step>
+<(@:)gffread-transcripts-step>
+<(@:)salmon-index-step>
+<(@:)kallisto-index-step>
+<(@:)hisat2-build-step>
 
 RUN
 <taffish>
 set -eu
 
 FLOW_NAME="rnaseq-index-flow"
-FLOW_VERSION="0.1.0-r1"
+FLOW_VERSION="0.2.0-r1"
 
 genome_arg="::(--genome)genome::"
 annotation_arg="::(--annotation)annotation::"
@@ -291,7 +297,7 @@ if [ -n "$genome_path" ] || [ -n "$annotation_path" ]; then
 elif [ -n "$transcripts_path" ]; then
     mode="transcripts_only"
     [ "$genome_indexer" = "none" ] || fail "--genome-indexer hisat2 requires --genome with --annotation"
-    [ -n "$tx2gene_path" ] || fail "--tx2gene is required when using --transcripts in rnaseq-index-flow 0.1.0-r1"
+    [ -n "$tx2gene_path" ] || fail "--tx2gene is required when using --transcripts in rnaseq-index-flow 0.2.0-r1"
     [ -r "$transcripts_path" ] || fail "cannot read --transcripts: $transcripts_path"
     [ -r "$tx2gene_path" ] || fail "cannot read --tx2gene: $tx2gene_path"
 else
@@ -396,14 +402,14 @@ tx2gene_out="$outdir/03_results/tx2gene.tsv"
 if [ "$mode" = "genome_annotation" ]; then
     standardized_gff3="$outdir/02_intermediate/annotation/annotation.gff3"
     step_log="$logs_steps_dir/02_prepare_annotation.log"
-    cmd="cd $(sq "$logs_steps_dir") && taf-agat-v1.7.0-r1 agat_convert_sp_gxf2gxf.pl --gff $(sq "$annotation_run_path") --output $(sq "$standardized_gff3")"
+    cmd="cd $(sq "$logs_steps_dir") && taf-agat-v1.7.0-r1 agat_convert_sp_gxf2gxf.pl --gff $(sq "$annotation_run_path") --output $(sq "$standardized_gff3") ::(@:)agat-convert-step::"
     record_command "02_prepare_annotation" "$cmd"
     log "START 02_prepare_annotation"
     rm -rf "$cwd/agat_log_annotation"
     if {
         printf '# step: 02_prepare_annotation\n'
         printf '# command: %s\n' "$cmd"
-        (CDPATH= cd "$logs_steps_dir" && [[taf: taf-agat-v1.7.0-r1 agat_convert_sp_gxf2gxf.pl --gff '"$annotation_run_path"' --output '"$standardized_gff3"' ]] </dev/null)
+        (CDPATH= cd "$logs_steps_dir" && [[taf: taf-agat-v1.7.0-r1 agat_convert_sp_gxf2gxf.pl --gff '"$annotation_run_path"' --output '"$standardized_gff3"' ::(@:)agat-convert-step:: ]] </dev/null)
     } > "$step_log" 2>&1; then
         if [ -e "$cwd/agat_log_annotation" ]; then
             mv "$cwd/agat_log_annotation" "$logs_steps_dir/agat_log_annotation"
@@ -433,13 +439,13 @@ if [ "$mode" = "genome_annotation" ]; then
         exit "$status"
     fi
     step_log="$logs_steps_dir/02_prepare_gtf.log"
-    cmd="taf-gffread-v0.12.9-r1 gffread $(sq "$genes_gff3") -T -o $(sq "$genes_gtf")"
+    cmd="taf-gffread-v0.12.9-r1 gffread $(sq "$genes_gff3") -T -o $(sq "$genes_gtf") ::(@:)gffread-gtf-step::"
     record_command "02_prepare_gtf" "$cmd"
     log "START 02_prepare_gtf"
     if {
         printf '# step: 02_prepare_gtf\n'
         printf '# command: %s\n' "$cmd"
-        [[taf: taf-gffread-v0.12.9-r1 gffread '"$genes_gff3"' -T -o '"$genes_gtf"' ]] </dev/null
+        [[taf: taf-gffread-v0.12.9-r1 gffread '"$genes_gff3"' -T -o '"$genes_gtf"' ::(@:)gffread-gtf-step:: ]] </dev/null
     } > "$step_log" 2>&1; then
         log "DONE  02_prepare_gtf"
     else
@@ -448,13 +454,13 @@ if [ "$mode" = "genome_annotation" ]; then
         exit "$status"
     fi
     step_log="$logs_steps_dir/03_extract_transcripts.log"
-    cmd="taf-gffread-v0.12.9-r1 gffread $(sq "$genes_gff3") -g $(sq "$genome_run_path") -w $(sq "$transcripts_out")"
+    cmd="taf-gffread-v0.12.9-r1 gffread $(sq "$genes_gff3") -g $(sq "$genome_run_path") -w $(sq "$transcripts_out") ::(@:)gffread-transcripts-step::"
     record_command "03_extract_transcripts" "$cmd"
     log "START 03_extract_transcripts"
     if {
         printf '# step: 03_extract_transcripts\n'
         printf '# command: %s\n' "$cmd"
-        [[taf: taf-gffread-v0.12.9-r1 gffread '"$genes_gff3"' -g '"$genome_run_path"' -w '"$transcripts_out"' ]] </dev/null
+        [[taf: taf-gffread-v0.12.9-r1 gffread '"$genes_gff3"' -g '"$genome_run_path"' -w '"$transcripts_out"' ::(@:)gffread-transcripts-step:: ]] </dev/null
     } > "$step_log" 2>&1; then
         log "DONE  03_extract_transcripts"
     else
@@ -517,13 +523,13 @@ hisat2_index_prefix=""
 if [ "$indexer" = "salmon" ] || [ "$indexer" = "both" ]; then
     salmon_index_dir="$outdir/03_results/salmon_index"
     step_log="$logs_steps_dir/04_build_salmon_index.log"
-    cmd="taf-salmon-v1.11.4-r1 salmon --no-version-check index -t $(sq "$transcripts_out") -i $(sq "$salmon_index_dir") -k $(sq "$kmer") -p $(sq "$threads")"
+    cmd="taf-salmon-v1.11.4-r1 salmon --no-version-check index ::(@:)salmon-index-step:: -t $(sq "$transcripts_out") -i $(sq "$salmon_index_dir") -k $(sq "$kmer") -p $(sq "$threads")"
     record_command "04_build_salmon_index" "$cmd"
     log "START 04_build_salmon_index"
     if {
         printf '# step: 04_build_salmon_index\n'
         printf '# command: %s\n' "$cmd"
-        [[taf: taf-salmon-v1.11.4-r1 salmon --no-version-check index -t '"$transcripts_out"' -i '"$salmon_index_dir"' -k '"$kmer"' -p '"$threads"' ]] </dev/null
+        [[taf: taf-salmon-v1.11.4-r1 salmon --no-version-check index ::(@:)salmon-index-step:: -t '"$transcripts_out"' -i '"$salmon_index_dir"' -k '"$kmer"' -p '"$threads"' ]] </dev/null
     } > "$step_log" 2>&1; then
         log "DONE  04_build_salmon_index"
     else
@@ -541,13 +547,13 @@ if [ "$indexer" = "kallisto" ] || [ "$indexer" = "both" ]; then
     kallisto_index_dir="$outdir/03_results/kallisto_index"
     mkdir -p "$kallisto_index_dir"
     step_log="$logs_steps_dir/05_build_kallisto_index.log"
-    cmd="taf-kallisto-v0.52.0-r1 kallisto index -i $(sq "$kallisto_index_dir/transcripts.idx") $(sq "$transcripts_out")"
+    cmd="taf-kallisto-v0.52.0-r1 kallisto index -i $(sq "$kallisto_index_dir/transcripts.idx") ::(@:)kallisto-index-step:: $(sq "$transcripts_out")"
     record_command "05_build_kallisto_index" "$cmd"
     log "START 05_build_kallisto_index"
     if {
         printf '# step: 05_build_kallisto_index\n'
         printf '# command: %s\n' "$cmd"
-        [[taf: taf-kallisto-v0.52.0-r1 kallisto index -i '"$kallisto_index_dir/transcripts.idx"' '"$transcripts_out"' ]] </dev/null
+        [[taf: taf-kallisto-v0.52.0-r1 kallisto index -i '"$kallisto_index_dir/transcripts.idx"' ::(@:)kallisto-index-step:: '"$transcripts_out"' ]] </dev/null
     } > "$step_log" 2>&1; then
         log "DONE  05_build_kallisto_index"
     else
@@ -566,13 +572,13 @@ if [ "$genome_indexer" = "hisat2" ]; then
     hisat2_index_prefix="$hisat2_index_dir/genome"
     mkdir -p "$hisat2_index_dir"
     step_log="$logs_steps_dir/06_build_hisat2_index.log"
-    cmd="taf-hisat2-v2.2.2-r2 hisat2-build -p $(sq "$threads") $(sq "$genome_run_path") $(sq "$hisat2_index_prefix")"
+    cmd="taf-hisat2-v2.2.2-r2 hisat2-build -p $(sq "$threads") ::(@:)hisat2-build-step:: $(sq "$genome_run_path") $(sq "$hisat2_index_prefix")"
     record_command "06_build_hisat2_index" "$cmd"
     log "START 06_build_hisat2_index"
     if {
         printf '# step: 06_build_hisat2_index\n'
         printf '# command: %s\n' "$cmd"
-        [[taf: taf-hisat2-v2.2.2-r2 hisat2-build -p '"$threads"' '"$genome_run_path"' '"$hisat2_index_prefix"' ]] </dev/null
+        [[taf: taf-hisat2-v2.2.2-r2 hisat2-build -p '"$threads"' ::(@:)hisat2-build-step:: '"$genome_run_path"' '"$hisat2_index_prefix"' ]] </dev/null
     } > "$step_log" 2>&1; then
         log "DONE  06_build_hisat2_index"
     else
